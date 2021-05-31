@@ -1,0 +1,22 @@
+[package]
+name = "fnes"
+version = "0.1.0"
+edition = "2018"
+
+
+[lib]
+name = "fnes"
+crate-type = ["cdylib", "staticlib"]
+
+
+[dependencies]
+nes_rust = "0.1.2"
+#image = "0.23.14"
+[build-dependencies]
+cbindgen = "0.19.0"
+
+[profile.release]
+opt-level = 'z'
+panic = 'abort'
+lto = true
+codegen-units = 1

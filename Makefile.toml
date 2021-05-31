@@ -1,0 +1,197 @@
+[env]
+LIB_OUT_DIR = "debug"
+TARGET_OS = "unknown"
+DEV = true
+RELEASE = false
+
+[env.release]
+RELEASE = true
+DEV = false
+LIB_OUT_DIR = "release"
+[tasks.build]
+description = "Runs the rust compiler."
+category = "Build"
+dependencies = ["android", "ios", "ffi"]
+
+[tasks.ffi]
+description = "generate dart ffi"
+category = "Build"
+command = "flutter"
+args = ["pub", "run", "ffigen"]
+
+[tasks.pre-publish]
+description = "publish --dry-run"
+category = "Build"
+command = "flutter"
+args = ["pub", "publish", "--dry-run"]
+
+[tasks.publish]
+description = "publish to pub"
+category = "Build"
+command = "flutter"
+args = ["pub", "publish", "--server=https://pub.dartlang.org"]
+dependencies = ["pre-publish"]
+
+[tasks.ios]
+description = "build iOS targets"
+category = "Build"
+dependencies = [
+    "ios-dev",
+    "ios-release",
+    "post-ios"
+]
+
+[tasks.ios-dev]
+condition = { platforms = ["mac"], env_true = ["DEV"] }
+description = "Build ios targets."
+category = "Build"
+command = "cargo"
+args = ["lipo"]
+
+[tasks.ios-release]
+condition = { platforms = ["mac"], env_true = ["RELEASE"] }
+description = "Build ios targets."
+category = "Build"
+command = "cargo"
+args = ["lipo", "--release"]
+
+#将编译好的.a文件和header文件拷贝至指定目录
+[tasks.post-ios]
+script_runner = "@duckscript"
+condition = { platforms = ["mac"] }
+script = [
+    """
+    cp target/universal/${LIB_OUT_DIR}/lib${CARGO_MAKE_CRATE_FS_NAME}.a  ios/lib${CARGO_MAKE_CRATE_FS_NAME}.a
+    """
+]
+
+[tasks.android]
+description = "Build android targets."
+category = "Build"
+dependencies = [
+    "pre-android",
+    "android-aarch64",
+    "android-aarch64-release",
+    "post-android-aarch64",
+    "android-armv7",
+    "android-armv7-release",
+    "post-android-armv7",
+    "android-i686",
+    "android-i686-release",
+    "post-android-i686",
+    "android-x86_64",
+    "android-x86_64-release",
+    "post-android-x86_64",
+]
+
+[tasks.android-build]
+private = true
+condition = { env_true = ["DEV"], env_set = ["ANDROID_BUILD_TARGET"] }
+command = "cargo"
+args = [
+    "build",
+    "--target",
+    "${ANDROID_BUILD_TARGET}",
+]
+
+[tasks.android-build-release]
+private = true
+condition = { env_true = ["RELEASE"], env_set = ["ANDROID_BUILD_TARGET"] }
+command = "cargo"
+args = [
+    "build",
+    "--target",
+    "${ANDROID_BUILD_TARGET}",
+    "--release"
+]
+
+[tasks.android-aarch64]
+private = true
+condition = { env_true = ["DEV"] }
+env = { ANDROID_BUILD_TARGET = "aarch64-linux-android" }
+run_task = "android-build"
+
+[tasks.android-armv7]
+private = true
+condition = { env_true = ["DEV"] }
+env = { ANDROID_BUILD_TARGET = "armv7-linux-androideabi" }
+run_task = "android-build"
+
+[tasks.android-i686]
+private = true
+condition = { env_true = ["DEV"] }
+env = { ANDROID_BUILD_TARGET = "i686-linux-android" }
+run_task = "android-build"
+
+[tasks.android-x86_64]
+private = true
+condition = { env_true = ["DEV"] }
+env = { ANDROID_BUILD_TARGET = "x86_64-linux-android" }
+run_task = "android-build"
+
+[tasks.android-aarch64-release]
+private = true
+condition = { env_true = ["RELEASE"] }
+env = { ANDROID_BUILD_TARGET = "aarch64-linux-android" }
+run_task = "android-build-release"
+
+[tasks.android-armv7-release]
+private = true
+condition = { env_true = ["RELEASE"] }
+env = { ANDROID_BUILD_TARGET = "armv7-linux-androideabi" }
+run_task = "android-build-release"
+
+[tasks.android-i686-release]
+private = true
+condition = { env_true = ["RELEASE"] }
+env = { ANDROID_BUILD_TARGET = "i686-linux-android" }
+run_task = "android-build-release"
+
+[tasks.android-x86_64-release]
+private = true
+condition = { env_true = ["RELEASE"] }
+env = { ANDROID_BUILD_TARGET = "x86_64-linux-android" }
+run_task = "android-build-release"
+
+#创建android jni文件目录
+[tasks.pre-android]
+private = true
+script_runner = "@duckscript"
+script = [
+    "mkdir android/src/main/jniLibs/arm64-v8a",
+    "mkdir android/src/main/jniLibs/armeabi-v7a",
+    "mkdir android/src/main/jniLibs/x86",
+    "mkdir android/src/main/jniLibs/x86_64",
+]
+
+#将编译好的so文件拷贝至指定目录
+[tasks.copy-lib]
+private = true
+condition = { env_set = ["ANDROID_TARGET", "JNI_LIB_DIR"] }
+script_runner = "@duckscript"
+script = [
+    """
+    cp target/${ANDROID_TARGET}/${LIB_OUT_DIR}/lib${CARGO_MAKE_CRATE_FS_NAME}.so \
+    android/src/main/jniLibs/${JNI_LIB_DIR}/lib${CARGO_MAKE_CRATE_FS_NAME}.so
+    """,
+]
+
+[tasks.post-android-aarch64]
+private = true
+env = { ANDROID_TARGET = "aarch64-linux-android", JNI_LIB_DIR = "arm64-v8a" }
+run_task = "copy-lib"
+
+[tasks.post-android-armv7]
+private = true
+env = { ANDROID_TARGET = "armv7-linux-androideabi", JNI_LIB_DIR = "armeabi-v7a" }
+run_task = "copy-lib"
+
+[tasks.post-android-i686]
+private = true
+env = { ANDROID_TARGET = "i686-linux-android", JNI_LIB_DIR = "x86" }
+run_task = "copy-lib"
+
+[tasks.post-android-x86_64]
+private = true
+env = { ANDROID_TARGET = "x86_64-linux-android", JNI_LIB_DIR = "x86_64" }
+run_task = "copy-lib"
