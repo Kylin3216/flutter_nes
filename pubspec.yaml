@@ -1,32 +1,30 @@
 name: flutter_nes
-description: A new flutter plugin project.
-version: 0.0.2
+description: flutter nes simulator.
+version: 0.1.0
 homepage: https://github.com/Kylin3216/flutter_nes.git
 
 environment:
-  sdk: ">=2.12.0 <3.0.0"
-  flutter: ">=1.20.0"
+  sdk: ">=2.17.5 <3.0.0"
+  flutter: ">=2.10.0"
 
 dependencies:
   flutter:
     sdk: flutter
-  ffi: ^1.0.0
-  http: ^0.13.3
+  ffi: ^2.0.1
+  http: ^0.13.5
+  flutter_rust_bridge: ^1.41.0
+  freezed_annotation: ^2.0.3
+#  just_audio: ^0.9.28
+  flutter_sound: ^9.2.13
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  ffigen: ^2.4.2
+  ffigen: ^6.0.1
+  flutter_lints: ^2.0.0
+  build_runner: ^2.1.11
+  freezed: ^2.0.4
 
-ffigen:
-  output: 'lib/src/native.dart'
-  name: 'FlutterNesNative'
-  headers:
-    entry-points:
-      - 'ios/Classes/binding.h'
-    include-directives:
-      - 'ios/Classes/binding.h'
-  llvm-path:
-    - '/usr/local/opt/llvm'
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -41,8 +39,13 @@ flutter:
       android:
         package: tech.dreamfund.flutter_nes
         pluginClass: FlutterNesPlugin
+        ffiPlugin: true
       ios:
         pluginClass: FlutterNesPlugin
+        ffiPlugin: true
+      macos:
+        pluginClass: FlutterNesPlugin
+        ffiPlugin: true
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

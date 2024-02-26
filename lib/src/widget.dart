@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'bridge.dart';
 import 'nes.dart';
 
 ///
@@ -10,76 +10,60 @@ import 'nes.dart';
 ///
 class FlutterNesWidget extends StatefulWidget {
   final FlutterNesController? controller;
-  final NesRom rom;
+  final FlutterNesRom rom;
 
   const FlutterNesWidget({required this.rom, this.controller, Key? key}) : super(key: key);
 
   @override
-  _FlutterNesWidgetState createState() => _FlutterNesWidgetState();
+  FlutterNesWidgetState createState() => FlutterNesWidgetState();
 }
 
-class _FlutterNesWidgetState extends State<FlutterNesWidget> {
-  FNesAsync? _fNes;
-  ui.Image? _data;
-  bool _dispose = false;
+class FlutterNesWidgetState extends State<FlutterNesWidget> {
+  late FlutterNes _fNes;
+
+  late Future<void> _future;
 
   @override
   void initState() {
-    _init();
+    _future = _init();
     super.initState();
   }
 
-  void _init() async {
-    _fNes = await FNesAsync.create();
-    await _fNes?.setRom(widget.rom);
-    await _fNes?.bootup();
-    await _fNes?.step();
-    _refresh();
-  }
-
-  void _refresh() async {
-    if (_dispose) return;
-    var time1 = DateTime.now();
-    await _fNes?.stepFrame();
-    var data = await _fNes?.getPixels();
-    if (data != null) {
-      ui.decodeImageFromPixels(data, 256, 240, ui.PixelFormat.rgba8888, (result) {
-        if (mounted) {
-          setState(() {
-            _data = result;
-          });
-          var time2 = DateTime.now();
-          var delta = time2.difference(time1).inMilliseconds;
-          if (delta < 16) {
-            Future.delayed(Duration(milliseconds: 16 - delta), () {
-              _refresh();
-            });
-          } else {
-            _refresh();
-          }
-        }
-      });
-    } else {
-      _refresh();
-    }
+  Future<void> _init() async {
+    _fNes = await FlutterNes.create();
+    widget.controller?._setUp(_fNes);
+    await _fNes.start(widget.rom);
   }
 
   @override
   void dispose() {
-    _dispose = true;
-    _fNes?.dispose();
+    _fNes.destroy();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    widget.controller?._setUp(_fNes);
-    return _data != null
-        ? CustomPaint(
-            painter: NesPainter(_data!),
-            size: Size(256, 240),
-          )
-        : CupertinoActivityIndicator();
+    return FutureBuilder(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return StreamBuilder<ui.Image>(
+              stream: _fNes.frameStream,
+              builder: (context, snap) {
+                if (snap.connectionState == ConnectionState.active) {
+                  if (snap.data != null) {
+                    return CustomPaint(
+                      size: const Size(256, 240),
+                      painter: NesPainter(snap.data!),
+                    );
+                  }
+                }
+                return const CupertinoActivityIndicator();
+              },
+            );
+          }
+          return const CupertinoActivityIndicator();
+        });
   }
 }
 
@@ -106,7 +90,8 @@ class FlutterNesButton extends StatelessWidget {
   final NesButton button;
   final Widget? child;
 
-  const FlutterNesButton({required this.controller, required this.button, this.child, Key? key}) : super(key: key);
+  const FlutterNesButton({required this.controller, required this.button, this.child, Key? key})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +108,7 @@ class FlutterNesButton extends StatelessWidget {
   Widget _defaultButton() {
     late IconData data;
     switch (button) {
-      case NesButton.Poweroff:
+      case NesButton.PowerOff:
         data = Icons.power_off;
         break;
       case NesButton.Reset:
@@ -135,40 +120,40 @@ class FlutterNesButton extends StatelessWidget {
       case NesButton.Start:
         data = Icons.not_started_outlined;
         break;
-      case NesButton.Joypad1A:
+      case NesButton.JoyPad1A:
         data = Icons.text_format;
         break;
-      case NesButton.Joypad1B:
+      case NesButton.JoyPad1B:
         data = Icons.format_bold;
         break;
-      case NesButton.Joypad1Up:
+      case NesButton.JoyPad1Up:
         data = Icons.keyboard_arrow_up;
         break;
-      case NesButton.Joypad1Down:
+      case NesButton.JoyPad1Down:
         data = Icons.keyboard_arrow_down;
         break;
-      case NesButton.Joypad1Left:
+      case NesButton.JoyPad1Left:
         data = Icons.keyboard_arrow_left;
         break;
-      case NesButton.Joypad1Right:
+      case NesButton.JoyPad1Right:
         data = Icons.keyboard_arrow_right;
         break;
-      case NesButton.Joypad2A:
+      case NesButton.JoyPad2A:
         data = Icons.upload_sharp;
         break;
-      case NesButton.Joypad2B:
+      case NesButton.JoyPad2B:
         data = Icons.airline_seat_legroom_extra;
         break;
-      case NesButton.Joypad2Up:
+      case NesButton.JoyPad2Up:
         data = Icons.airline_seat_legroom_extra;
         break;
-      case NesButton.Joypad2Down:
+      case NesButton.JoyPad2Down:
         data = Icons.airline_seat_legroom_extra;
         break;
-      case NesButton.Joypad2Left:
+      case NesButton.JoyPad2Left:
         data = Icons.airline_seat_legroom_extra;
         break;
-      case NesButton.Joypad2Right:
+      case NesButton.JoyPad2Right:
         data = Icons.airline_seat_legroom_extra;
         break;
     }
@@ -177,21 +162,21 @@ class FlutterNesButton extends StatelessWidget {
 }
 
 class FlutterNesController {
-  FNesAsync? _fNesAsync;
+  FlutterNes? _fNes;
 
-  void _setUp(FNesAsync? fNes) {
-    _fNesAsync = fNes;
+  void _setUp(FlutterNes? fNes) {
+    _fNes = fNes;
   }
 
   Future<void> reset() async {
-    await _fNesAsync?.reset();
+    await _fNes?.reset();
   }
 
   Future<void> pressButton(NesButton button) async {
-    await _fNesAsync?.pressButton(button);
+    await _fNes?.pressButton(button);
   }
 
   Future<void> releaseButton(NesButton button) async {
-    await _fNesAsync?.releaseButton(button);
+    await _fNes?.releaseButton(button);
   }
 }
